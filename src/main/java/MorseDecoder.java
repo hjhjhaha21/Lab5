@@ -54,7 +54,12 @@ public class MorseDecoder {
         double[] sampleBuffer = new double[BIN_SIZE * inputFile.getNumChannels()];
         for (int binIndex = 0; binIndex < totalBinCount; binIndex++) {
             // Get the right number of samples from the inputFile
+            inputFile.readFrames(sampleBuffer, BIN_SIZE);
             // Sum all the samples together and store them in the returnBuffer
+            for (double sample : sampleBuffer) {
+                returnBuffer[binIndex] += Math.abs(sample);
+            }
+
         }
         return returnBuffer;
     }
@@ -63,7 +68,7 @@ public class MorseDecoder {
     private static final double POWER_THRESHOLD = 10;
 
     /** Bin threshold for dots or dashes. Related to BIN_SIZE. You may need to modify this value. */
-    private static final int DASH_BIN_COUNT = 8;
+    private static final int DASH_BIN_COUNT = 15;
 
     /**
      * Convert power measurements to dots, dashes, and spaces.
@@ -82,12 +87,50 @@ public class MorseDecoder {
          * transitions. You will also have to store how much power or silence you have seen.
          */
 
-        // if ispower and waspower
-        // else if ispower and not waspower
-        // else if issilence and wassilence
-        // else if issilence and not wassilence
+        String result = "";
+        int dashTracker = 0;
+        int spaceTracker = 0;
+        boolean wasPower = false;
+        boolean wasSilence = false;
 
-        return "";
+        for (int i = 0; i < powerMeasurements.length; i++) {
+            double samplePower = powerMeasurements[i];
+            boolean isPower = samplePower >= POWER_THRESHOLD;
+            boolean isSilence = !isPower;
+
+            if (isPower && wasPower) {
+                dashTracker++;
+                wasPower = true;
+                wasSilence = !wasPower;
+
+            } else if (isPower && !wasPower) {
+                dashTracker++;
+                wasPower = true;
+                wasSilence = !wasPower;
+                if (spaceTracker >= DASH_BIN_COUNT) {
+                    result += " ";
+                }
+                spaceTracker = 0;
+
+            } else if (isSilence && wasSilence) {
+                spaceTracker++;
+                wasSilence = true;
+                wasPower = !wasSilence;
+
+            } else if (isSilence && !wasSilence) {
+                if (dashTracker >= DASH_BIN_COUNT) {
+                    result += "-";
+                } else if (dashTracker < DASH_BIN_COUNT) {
+                    result += ".";
+                }
+                dashTracker = 0;
+                spaceTracker++;
+                wasSilence = true;
+                wasPower = !wasSilence;
+            }
+
+        }
+        return result;
     }
 
     /**
